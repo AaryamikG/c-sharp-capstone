@@ -41,7 +41,7 @@ Our Digital Library Management System provides:
 
 ### Getting Started
 
-1. [Development Environment Setup](docs/dev-environment-setup.md) - Set up in-memory database and local development
+1. [Development Environment Setup](docs/dev-enviroment-setup.md) - Set up in-memory database and local development
    environment
 2. [Milestone 1: Data Modeling](docs/milestone-1-data-modeling-guide.md) - Create entity classes and database schema
 
@@ -55,7 +55,7 @@ Our Digital Library Management System provides:
 
 ### Quality & Deployment
 
-6. [Milestone 5: Deployment & Production Readiness](docs/milestone-6-deployment-production-readiness.md) - Deploy to AWS
+6. [Milestone 5: Deployment & Production Readiness](docs/milestone-5-deployment-production-readiness.md) - Deploy to AWS
    Elastic Beanstalk with RDS
 
 ### Reference Documentation
