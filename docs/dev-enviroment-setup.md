@@ -231,7 +231,7 @@ You're ready to start building! Proceed to:
 ## Important Reminders
 
 - Data resets on every application restart (in-memory database behavior)
-- Always test using HTTP (`https://localhost:{port}`)
+- Always test using HTTP (`http://localhost:{port}`)
 - Swagger UI is your friend for testing endpoints
 - Check console logs for errors and information
 
