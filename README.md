@@ -86,7 +86,7 @@ The system consists of **three independent microservices**:
     - All 10 endpoint definitions with request/response formats
     - Defines the contract you must fulfill
 
-3. **[Development Environment Setup](docs/dev-environment-setup.md)**
+3. **[Development Environment Setup](docs/dev-enviroment-setup.md)**
     - Initial project setup and local development configuration
 
 ### Implementation Approach
