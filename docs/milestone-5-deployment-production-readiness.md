@@ -1,409 +1,278 @@
 # Milestone 6: Deployment & Production Readiness
 
-**Goal:** Deploy ASP.NET Core application to AWS Elastic Beanstalk with RDS PostgreSQL
+**Goal:** Deploy all three microservices to cloud infrastructure with production databases
+
+**Related User Stories:** All (US-001 through US-011) - Production deployment
+
+---
+
+## Business Requirements
+
+### Deployment Objectives
+- All three microservices must be publicly accessible via internet
+- System must use production-grade databases (not in-memory)
+- All API endpoints must function in production environment
+- Applications must be secure and properly configured
+- Database credentials and secrets must be protected
+- Services must be able to communicate with each other in production
+
+### Production Environment Requirements
+- Three publicly accessible API endpoints (one per service)
+- Persistent data storage for each service
+- Environment-specific configuration
+- Secure credential management
+- Health monitoring capability
+- Inter-service communication properly configured
+
+---
+
+## General Technical Requirements
+
+**Deployment Platform:**
+- AWS Elastic Beanstalk (or equivalent cloud platform)
+- .NET 8.0 or 9.0 runtime environment
+- Three separate application deployments (one per service)
+- Free tier eligible instances
+
+**Database:**
+- PostgreSQL 15.x on AWS RDS (or equivalent)
+- Three separate databases (one per service)
+- Persistent storage
+- Secure network configuration
+- Automated backups
+
+**Configuration:**
+- Environment-based configuration management
+- Secure storage of sensitive data (passwords, secrets, API keys)
+- Port configuration for cloud platform
+- Database connection parameters
+- Service URL configuration for inter-service communication
+
+**Security:**
+- Restricted database access (not publicly accessible)
+- Network security groups configured correctly
+- Secure JWT secret generation and storage
+- HTTPS support (recommended)
 
 ---
 
 ## Deliverables
 
-### 1. Application Preparation
+### 1. Application Build
+Prepare each microservice for deployment:
+- Build production-ready packages (publish output) for all three services
+- Verify builds include all dependencies and migrations
+- Ensure configuration supports environment variables
+- Create deployment packages (ZIP files) for each service
 
-**Install Required NuGet Packages:**
+### 2. Database Setup
+Create production databases:
+- Three PostgreSQL database instances (or three databases on one instance)
+    - UserServiceDb
+    - CatalogServiceDb
+    - ReservationServiceDb
+- Initial database creation
+- Secure credential generation
+- Network configuration for application access
 
-Add PostgreSQL support to your project:
+### 3. Application Deployment
+Deploy all three microservices to cloud platform:
+- Create three separate application environments
+- Upload application artifacts for each service
+- Configure runtime environments
+- Set up necessary IAM roles and permissions
 
-```bash
-dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
-dotnet add package Microsoft.EntityFrameworkCore.Design
-```
+### 4. Environment Configuration
+Configure each service's environment:
+- Set appropriate ports or URLs for platform requirements
+- Configure database connection parameters for each service
+- Set JWT secret (shared across services for token validation)
+- Configure service URLs for inter-service communication
+- Enable production profile
 
-**Update Program.cs for Production:**
+### 5. Network Security
+Configure secure network access:
+- Set up security groups
+- Allow each application to connect to its database
+- Allow services to communicate with each other
+- Restrict databases to private network
+- Configure public application accessibility
 
-Modify your database configuration to support both development (in-memory) and production (PostgreSQL):
-
-```csharp
-// Configure database based on environment
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseInMemoryDatabase("LibraryDb"));
-}
-else
-{
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseNpgsql(connectionString));
-}
-```
-
-**Update database initialization:**
-
-Replace `EnsureCreatedAsync()` with `MigrateAsync()`:
-
-```csharp
-// Apply database migrations in production
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    
-    if (!app.Environment.IsDevelopment())
-    {
-        await context.Database.MigrateAsync();
-    }
-}
-```
-
----
-
-### 2. Create Entity Framework Migrations
-
-**Install EF Core Tools:**
-
-```bash
-dotnet tool install --global dotnet-ef
-export PATH="$PATH:$HOME/.dotnet/tools"
-```
-
-**Create Initial Migration:**
-
-```bash
-# Delete old migrations if they exist
-rm -rf Migrations/
-
-# Create fresh migration
-dotnet ef migrations add InitialCreate
-
-# Verify migration files were created
-ls -la Migrations/
-```
-
-**Important:** Use static DateTime values in seed data to avoid migration issues:
-
-```csharp
-// Correct - static date
-CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-
-// Incorrect - causes migration warnings
-CreatedAt = DateTime.UtcNow
-```
+### 6. Verification
+Verify deployment success for all services:
+- Confirm all application health endpoints respond
+- Test all API endpoints across services
+- Verify database connectivity for each service
+- Check API documentation accessibility for each service
+- Test inter-service communication
 
 ---
 
-### 3. Build Production Package
-
-```bash
-# Clean previous builds
-dotnet clean
-rm -rf publish/
-rm -f LibraryManagementApi.zip
-
-# Build and publish
-dotnet publish -c Release -o ./publish
-
-# Create deployment package
-cd publish
-zip -r ../LibraryManagementApi.zip .
-cd ..
-
-# Verify migrations are included
-unzip -l LibraryManagementApi.zip | grep -i migration
-```
-
----
-
-### 4. Setting up RDS PostgreSQL Database
-
-Navigate to **AWS Console → RDS → Create database**
-
-**Engine Options:**
-- Engine type: PostgreSQL
-- Version: PostgreSQL 15.x
-- Templates: Free tier (development) or Production
-
-**Availability and Durability:**
-- Deployment option: Single DB instance
-
-**Database Settings:**
-- DB instance identifier: `library-app-database`
-- Master username: `postgres`
-- Credentials management: Self managed
-- Master password: Create and save a strong password securely
-
-**Instance Configuration:**
-- DB instance class: Burstable classes
-- Select: `db.t4g.micro` (free tier eligible)
-
-**Storage Configuration:**
-- Storage type: General Purpose SSD (gp2)
-- Allocated storage: `20` GiB
-- Storage autoscaling: Optional
-
-**Connectivity:**
-- Compute resource: Don't connect to an EC2 compute resource
-- Network type: IPv4
-- Virtual Private Cloud (VPC): Default VPC
-- DB subnet group: default
-- Public access: No
-- VPC security group: Choose existing → default
-- Availability Zone: No preference
-
-**Additional Configuration:**
-- Initial database name: `librarydb`
-- DB parameter group: default.postgres15
-- Backup retention: 7 days (production) or 1 day (development)
-- Encryption: Enable encryption at rest
-
-**After Creation:**
-- Wait 5-10 minutes for database to become "Available"
-- Navigate to your database in RDS console
-- Copy the **Endpoint** from Connectivity & security tab
-- Format: `library-app-database.xxxxx.us-east-1.rds.amazonaws.com`
-- Note the **Port**: 5432
-
----
-
-### 5. Setting up Elastic Beanstalk Application
-
-Navigate to **AWS Console → Elastic Beanstalk → Create application**
-
-**Environment Tier:**
-- Select: Web server environment
-
-**Application Information:**
-- Application name: `library-management-api`
-- Application tags: (Optional)
-
-**Environment Information:**
-- Environment name: `library-api-env`
-- Domain: Leave blank (AWS will generate URL)
-- Description: Library Management System REST API
-
-**Platform Configuration:**
-- Platform: .NET Core on Linux
-- Platform branch: .NET 8 or .NET 9 running on 64bit Amazon Linux 2023
-- Platform version: Latest recommended version
-
-**Application Code:**
-- Select: Upload your code
-- Version label: `v1.0.0`
-- Source code origin: Local file
-- Choose file: Select `LibraryManagementApi.zip`
-
-**Presets:**
-- Configuration presets: Single instance (free tier)
-
-Click **"Next"** to configure more options
-
----
-
-### 6. Service Access Configuration
-
-**IAM Roles:**
-- Service role: `aws-elasticbeanstalk-service-role`
-- EC2 instance profile: `aws-elasticbeanstalk-ec2-role`
-
-AWS will automatically create these roles if they don't exist.
-
-**EC2 Key Pair:**
-- Leave as default (not required)
-
----
-
-### 7. Networking Configuration
-
-**VPC Configuration:**
-- VPC: Select default VPC (must match your RDS VPC)
-- Instance settings:
-    - Public IP address: Leave unchecked
-- Instance subnets: Select at least one subnet:
-    - us-east-1a (subnet-xxxxxxxxx)
-    - us-east-1b (subnet-xxxxxxxxx)
-
-**Database:**
-- Enable database: Leave **UNCHECKED** (using existing RDS)
-
-**Tags:**
-- Optional: Add tags for resource management
-
----
-
-### 8. Environment Properties Configuration
-
-Configure these environment variables:
-
-| Name | Value | Description |
-|------|-------|-------------|
-| `ASPNETCORE_ENVIRONMENT` | `Production` | Activates production configuration |
-| `ConnectionStrings__DefaultConnection` | `Host=[RDS-ENDPOINT];Port=5432;Database=librarydb;Username=postgres;Password=[YOUR-PASSWORD]` | PostgreSQL connection string |
-| `Jwt__Secret` | `[generate-secure-secret]` | Generate with: `openssl rand -base64 32` |
-| `Jwt__Issuer` | `LibraryManagementApi` | JWT token issuer |
-| `Jwt__Audience` | `LibraryManagementApiUsers` | JWT token audience |
-
-**To get your RDS endpoint:**
-1. Go to RDS console
-2. Click on `library-app-database`
-3. Find endpoint in Connectivity & security section
-4. Copy the full endpoint URL
-
-**To generate JWT secret:**
-```bash
-openssl rand -base64 32
-```
-
-**Note:** The double underscore `__` in `ConnectionStrings__DefaultConnection` is how .NET reads nested configuration from environment variables.
-
----
-
-### 9. Review and Create
-
-- Review all configuration settings
-- Click **"Submit"** to create the environment
-- Wait 5-10 minutes for environment creation
-
----
-
-### 10. Security Group Configuration
-
-After both RDS and Elastic Beanstalk are running:
-
-**Update RDS Security Group:**
-1. Navigate to **EC2 → Security Groups**
-2. Find your RDS security group (check RDS instance details)
-3. Click **Edit inbound rules**
-4. Add inbound rule:
-    - Type: PostgreSQL
-    - Port: 5432
-    - Source: Custom → Select Elastic Beanstalk security group
-    - Description: "Allow EB to connect to RDS"
-5. Save rules
-
----
-
-## Post-Deployment Verification
-
-### 1. Check Environment Health
-
-- Go to Elastic Beanstalk console
-- Environment health should show **green "Ok"** status
-- If red, check logs for errors
-
-### 2. Test API Endpoints
-
-**Access Swagger UI:**
-```
-http://[your-eb-url]/swagger
-```
-
-**Register a user:**
-```bash
-curl -X POST http://[your-eb-url]/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "Test123!@#",
-    "firstName": "Test",
-    "lastName": "User",
-    "phoneNumber": "+1-555-0123"
-  }'
-```
-
-**Login:**
-```bash
-curl -X POST http://[your-eb-url]/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "Test123!@#"
-  }'
-```
-
-**Browse catalog (no auth required):**
-```bash
-curl http://[your-eb-url]/api/catalog/books
-```
-
-### 3. Verify Database Connection
-
-- Check Elastic Beanstalk logs for successful database migration
-- Should see: "Applied migration 'InitialCreate'"
-- Database tables should be created automatically
-
----
-
-## Troubleshooting
-
-### Environment Health is Red
-
-**Check:**
-- Application logs in Elastic Beanstalk console
-- Verify `ASPNETCORE_ENVIRONMENT=Production` is set
-- Confirm all environment variables are configured correctly
-- Look for startup errors in logs
-
-### Database Connection Failed
-
-**Check:**
-- Connection string format is correct with double underscores
-- RDS endpoint matches exactly
-- Database name is `librarydb` (as configured in RDS)
-- RDS security group allows inbound from EB security group
-- Both RDS and EB are in the same VPC
-- Database credentials are correct
-- RDS instance status is "Available"
-
-### Migration Not Applied
-
-**Check:**
-- Migrations folder is included in ZIP file: `unzip -l LibraryManagementApi.zip | grep -i migration`
-- `MigrateAsync()` is called in Program.cs
-- Application has permission to create tables
-- Check logs for migration errors
-
-### DateTime/Timestamp Errors
-
-**Error:** `timestamp with time zone literal cannot be generated`
-
-**Solution:** Always use `DateTimeKind.Utc` for DateTime values:
-```csharp
-new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-```
-
-### 404 on All Endpoints
-
-**Check:**
-- Application started successfully (check logs)
-- Controllers are properly configured with routes
-- Swagger UI accessible (indicates app is running)
+## Required Environment Configuration
+
+### User Service Environment Variables:
+- **ASPNETCORE_ENVIRONMENT:** Production
+- **ConnectionStrings__DefaultConnection:** PostgreSQL connection string for UserServiceDb
+- **Jwt__Secret:** Secure JWT secret (shared across all services)
+- **Jwt__Issuer:** Token issuer name
+- **Jwt__Audience:** Token audience name
+- **ServiceUrls__ReservationService:** URL of Reservation Service
+
+### Catalog Service Environment Variables:
+- **ASPNETCORE_ENVIRONMENT:** Production
+- **ConnectionStrings__DefaultConnection:** PostgreSQL connection string for CatalogServiceDb
+
+### Reservation Service Environment Variables:
+- **ASPNETCORE_ENVIRONMENT:** Production
+- **ConnectionStrings__DefaultConnection:** PostgreSQL connection string for ReservationServiceDb
+- **Jwt__Secret:** Secure JWT secret (same as User Service)
+- **Jwt__Issuer:** Token issuer name (same as User Service)
+- **Jwt__Audience:** Token audience name (same as User Service)
+- **ServiceUrls__UserService:** URL of User Service
+- **ServiceUrls__CatalogService:** URL of Catalog Service
+
+**Note:** All sensitive values should be configured as environment variables, never hardcoded.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] NuGet packages installed (Npgsql, EF Core Design)
-- [ ] Migrations created successfully
-- [ ] Deployment package (ZIP) built with migrations included
-- [ ] RDS PostgreSQL database created with `librarydb` database
-- [ ] RDS endpoint obtained and documented
-- [ ] Elastic Beanstalk environment created successfully
-- [ ] Environment health shows green "Ok" status
-- [ ] All environment variables configured correctly
-- [ ] Security groups configured (EB can connect to RDS)
-- [ ] Swagger UI accessible
-- [ ] Can register user successfully
-- [ ] Can login and receive JWT token
-- [ ] Can browse catalog without authentication
-- [ ] Can create reservation with authentication
-- [ ] Librarian can checkout and return books
-- [ ] Database tables created automatically by migrations
+- [ ] All three microservices build successfully as deployable artifacts
+- [ ] Three production PostgreSQL databases created and accessible
+- [ ] User Service deployed and running
+- [ ] Catalog Service deployed and running
+- [ ] Reservation Service deployed and running
+- [ ] All environment health shows healthy/running status
+- [ ] All environment variables configured correctly for each service
+- [ ] Network security allows each application-to-database communication
+- [ ] Network security allows inter-service communication
+- [ ] Network security restricts public database access
+- [ ] Health check endpoints respond successfully for all services
+- [ ] API documentation (Swagger) accessible for all services
+- [ ] User registration works in production (User Service)
+- [ ] User login returns JWT token (User Service)
+- [ ] Profile endpoint retrieves statistics from Reservation Service
+- [ ] Catalog browsing works without authentication (Catalog Service)
+- [ ] Book availability updates work from Reservation Service to Catalog Service
+- [ ] Reservation creation validates user via User Service
+- [ ] Reservation creation updates availability via Catalog Service
+- [ ] Authenticated endpoints require valid token
+- [ ] Role-based authorization enforced (LIBRARIAN operations)
+- [ ] Database schemas created automatically for all services
+- [ ] All 11 API endpoints functional in production across all services
 
 ---
 
-## Technical Specifications
+## Deployment Verification Checklist
 
-- Platform: Elastic Beanstalk .NET Core on Linux
-- .NET Version: 8.0 or 9.0
-- Database: RDS PostgreSQL 15.x
-- Instance: db.t4g.micro (free tier eligible)
-- Storage: 20GB RDS
-- Region: US East (us-east-1)
-- Schema management: EF Core migrations
+After deployment, verify each service and inter-service communication:
+
+### User Service (Port/URL 1)
+- Application URL is accessible
+- Swagger UI loads
+- User can register
+- User can login and receive JWT token
+- Profile endpoint works (calls Reservation Service for statistics)
+- User validation endpoint works (for Reservation Service)
+
+### Catalog Service (Port/URL 2)
+- Application URL is accessible
+- Swagger UI loads
+- Catalog browsing works without authentication
+- Book search and filtering work
+- Book details retrieval works
+- Availability update endpoint works (for Reservation Service)
+
+### Reservation Service (Port/URL 3)
+- Application URL is accessible
+- Swagger UI loads
+- Reservation creation works (validates via User Service, updates via Catalog Service)
+- Active reservations display correctly
+- Checkout works (LIBRARIAN only)
+- Return works (LIBRARIAN only, updates Catalog Service)
+- Borrowing history works
+
+### Inter-Service Communication
+- User Service successfully calls Reservation Service for profile statistics
+- Reservation Service successfully validates users via User Service
+- Reservation Service successfully checks book availability via Catalog Service
+- Reservation Service successfully updates book availability via Catalog Service
+
+### Authorization
+- Patron cannot access checkout endpoint (403)
+- Patron cannot access return endpoint (403)
+- Librarian can access checkout endpoint
+- Librarian can access return endpoint
+
+### Data Persistence
+- Created users persist after User Service restart
+- Books remain in catalog after Catalog Service restart
+- Reservations persist after Reservation Service restart
+
+---
+
+## Troubleshooting Guidelines
+
+If deployment fails or application doesn't work:
+
+**Check Application Health:**
+- Review application logs for each service
+- Verify all environment variables are set correctly
+- Confirm each application started successfully
+- Check for port conflicts or binding issues
+
+**Database Connection Issues:**
+- Verify database endpoint is correct for each service
+- Check database credentials for each service
+- Confirm security groups allow connection from each application
+- Ensure databases are running and accessible
+- Verify database names match configuration
+
+**Inter-Service Communication Issues:**
+- Verify service URLs are correctly configured
+- Check network security allows service-to-service communication
+- Test service endpoints individually
+- Review logs for connection errors
+- Ensure services can resolve each other's URLs
+
+**Application Errors:**
+- Review startup logs for errors in each service
+- Verify .NET version compatibility
+- Check all required dependencies included
+- Confirm migrations are applied successfully
+
+**API Not Working:**
+- Verify application started successfully
+- Check endpoint mappings in logs
+- Test with simple curl commands
+- Verify authentication works across services
+- Test inter-service calls
+
+---
+
+## Suggested Approach
+
+1. Build and verify all three application artifacts locally
+2. Set up cloud database instances (three databases)
+3. Configure database security and credentials
+4. Deploy User Service first
+5. Test User Service independently
+6. Deploy Catalog Service second
+7. Test Catalog Service independently
+8. Deploy Reservation Service last
+9. Configure inter-service communication URLs
+10. Test complete workflows across all services
+11. Verify health endpoints for all services
+12. Test all API functionality end-to-end
+13. Document deployment (URLs, credentials, configuration)
+
+**Note:** You have flexibility in choosing cloud platform services and configuration approaches. Focus on achieving working, secure, production deployments that meet all acceptance criteria. Services can be deployed to separate Elastic Beanstalk environments or containerized solutions.
+
+---
+
+## Resources
+
+- Refer to `user-stories.md` for all functionality to verify in production
+- Refer to `api-contracts.md` for endpoint testing
+- Refer to `production-environment-setup.md` for detailed AWS setup
+- Refer to `milestone-1` for microservices architecture overview

@@ -1,13 +1,12 @@
-# Digital Library Management System API (.NET)
+# Digital Library Management System API (.NET Microservices)
 
 ## Business Context
 
 ### Overview
 
-The Digital Library Management System is a modern backend API solution designed to digitize and streamline library
-operations for public and institutional libraries. As libraries transition from manual record-keeping to digital
-platforms, this system provides a comprehensive solution for managing book catalogs, user memberships, and borrowing
-workflows.
+The Digital Library Management System is a modern microservices-based backend API solution designed to digitize and
+streamline library operations for public and institutional libraries transitioning from manual record-keeping to digital
+platforms.
 
 ### Business Problem
 
@@ -28,7 +27,8 @@ Our Digital Library Management System provides:
 - **Real-time availability tracking** to reduce operational overhead
 - **Librarian tools** for efficient checkout and return processing
 - **Borrowing history** for patrons to track their reading activity
-- **Scalable architecture** ready for cloud deployment
+- **Microservices architecture** for scalability and independent service deployment
+- **Cloud-ready infrastructure** for AWS deployment
 
 ### Target Users
 
@@ -37,48 +37,107 @@ Our Digital Library Management System provides:
 
 ---
 
-## Project Documentation
+## Architecture Overview
 
-### Getting Started
+### Microservices Design
 
-1. [Development Environment Setup](docs/dev-enviroment-setup.md) - Set up in-memory database and local development
-   environment
-2. [Milestone 1: Data Modeling](docs/milestone-1-data-modeling-guide.md) - Create entity classes and database schema
+The system consists of **three independent microservices**:
 
-### Core Features Implementation
+1. **User Service** (Port 5001)
+    - User registration and authentication
+    - JWT token generation and validation
+    - User profile management
+    - User validation for other services
 
-3. [Milestone 2: User Service & Authentication](docs/milestone-2-user-service-authentication.md) - Implement
-   registration, login, and JWT authentication
-4. [Milestone 3: Catalog Service](docs/milestone-3-catalog-service.md) - Build book browsing and search functionality
-5. [Milestone 4: Reservation Service](docs/milestone-4-reservation-service-core-functionality.md) - Implement
-   reservation lifecycle management
+2. **Catalog Service** (Port 5002)
+    - Book inventory management
+    - Catalog browsing and search
+    - Book availability tracking
+    - Availability updates from reservations
 
-### Quality & Deployment
+3. **Reservation Service** (Port 5003)
+    - Reservation lifecycle management
+    - Checkout and return processing
+    - Borrowing history
+    - Orchestrates calls to User and Catalog services
 
-6. [Milestone 5: Deployment & Production Readiness](docs/milestone-5-deployment-production-readiness.md) - Deploy to AWS
-   Elastic Beanstalk with RDS
+### Service Communication
 
-### Reference Documentation
-
-- [User Stories](docs/user-stories.md) - 11 user stories covering all features
-- [API Contracts](docs/api-contracts.md) - Complete API documentation for all 10 endpoints
+- Each service has its own database (Database per Service pattern)
+- Services communicate via HTTP/REST APIs
+- User Service provides authentication for all services
+- Reservation Service orchestrates business workflows
 
 ---
 
-## API Endpoints (10 Total)
+## Getting Started
 
-### Authentication & User Management (3 endpoints)
+### Core Requirements Documents
+
+**Review these foundational documents before implementation:**
+
+1. **[User Stories](docs/user-stories.md)** - **START HERE**
+    - 11 user stories defining all system functionality
+    - Business requirements and acceptance criteria
+    - Your primary requirements document
+
+2. **[API Contracts](docs/api-contracts.md)** - **CRITICAL**
+    - Complete external API interface specification
+    - All 10 endpoint definitions with request/response formats
+    - Defines the contract you must fulfill
+
+3. **[Development Environment Setup](docs/dev-environment-setup.md)**
+    - Initial project setup and local development configuration
+
+### Implementation Approach
+
+**Prioritize understanding requirements over implementation details:**
+
+- User Stories define business requirements and desired outcomes
+- API Contracts define the exact external interface
+- Milestone documents provide technical guidance and acceptance criteria
+
+You have flexibility in **HOW** you implement the solution, but must meet the requirements defined in User Stories and
+API Contracts.
+
+---
+
+## Project Structure
+
+### Requirements Documentation
+
+- **[User Stories](docs/user-stories.md)** - Business requirements
+- **[API Contracts](docs/api-contracts.md)** - External API interface
+
+### Implementation Guides (Milestones)
+
+1. [Milestone 1: Microservices Architecture & Data Modeling](docs/milestone-1-microservices-architecture-and-data-modeling.md)
+2. [Milestone 2: User Service & Authentication](docs/milestone-2-user-service-authentication.md)
+3. [Milestone 3: Catalog Service](docs/milestone-3-catalog-service.md)
+4. [Milestone 4: Reservation Service](docs/milestone-4-reservation-service-core-functionality.md)
+5. [Milestone 6: Deployment & Production Readiness](docs/milestone-5-deployment-production-readiness.md)
+
+### Environment Setup
+
+- [Development Environment Setup](docs/dev-enviroment-setup.md)
+- [Production Environment Setup (AWS)](docs/production-enviroment-setup.md)
+
+---
+
+## API Endpoints by Service
+
+### User Service (Port 5001) - 3 Endpoints
 
 - `POST /api/auth/register` - Create new user account
 - `POST /api/auth/login` - Authenticate and receive JWT token
 - `GET /api/users/profile` - View user profile with statistics
 
-### Catalog Management (2 endpoints)
+### Catalog Service (Port 5002) - 2 Endpoints
 
 - `GET /api/catalog/books` - Browse and search books with pagination
 - `GET /api/catalog/books/{bookId}` - View detailed book information
 
-### Reservation Management (5 endpoints)
+### Reservation Service (Port 5003) - 5 Endpoints
 
 - `POST /api/reservations` - Reserve an available book
 - `GET /api/reservations` - View active reservations
@@ -86,68 +145,179 @@ Our Digital Library Management System provides:
 - `POST /api/reservations/{reservationId}/return` - Return book with late fee calculation (Librarian only)
 - `GET /api/reservations/history` - View complete borrowing history
 
+**See [API Contracts](docs/api-contracts.md) for complete specifications.**
+
 ---
 
-## Technical Stack Summary
+## Technical Stack
 
-### Core Technologies
+### Required Technologies
 
-- **.NET**: 8.0 (LTS)
-- **ASP.NET Core**: 8.x
-- **ASP.NET Core Identity**: 8.x (User management and authentication)
-- **Entity Framework Core**: 8.x
-- **Database**: In-Memory (Development), PostgreSQL 15+ (Production)
+- **ASP.NET Core**: 8.0 or 9.0
+- **C#**: 12
+- **Entity Framework Core**: 8.0+
+- **PostgreSQL**: 15+ (in-memory for development, RDS for production)
+- **.NET CLI** or **Visual Studio 2022**
+
+### Authentication & Security
+
+- **Microsoft.AspNetCore.Authentication.JwtBearer**: JWT token validation
+- **System.IdentityModel.Tokens.Jwt**: JWT token generation
+- **BCrypt.Net-Next**: Password hashing
 
 ### Additional Libraries
 
-- **JWT**: Microsoft.AspNetCore.Authentication.JwtBearer
-- **Validation**: FluentValidation.AspNetCore
-- **OpenAPI**: Swashbuckle.AspNetCore (Swagger)
-- **Testing**: xUnit, Moq, FluentAssertions, Microsoft.AspNetCore.Mvc.Testing
+Choose appropriate libraries for:
 
-### AWS Deployment
+- API documentation (Swashbuckle/Swagger)
+- Testing frameworks (xUnit, NUnit, MSTest)
+- HTTP client for inter-service communication
+- Validation
 
-- **AWS Elastic Beanstalk**: .NET application hosting
-- **AWS RDS**: PostgreSQL database
-- **Environment Variables**: Configuration via Elastic Beanstalk environment properties
-- **Amazon VPC**: Network security and isolation
+### Deployment
+
+- **AWS Elastic Beanstalk**: Application hosting (3 separate environments)
+- **AWS RDS**: PostgreSQL databases (3 databases)
+- **VPC & Security Groups**: Network security and service communication
 
 ---
 
 ## Success Criteria
 
-> Capstones will be graded using the following success criteria on a Pass/Fail basis.<br>
-> You will receive a score out of 20, along with instructor feedback.
+> Capstones are graded Pass/Fail with a score out of 20 and instructor feedback.
 
-### Functional Requirements
+### Microservices Architecture
 
-- ✅ All 11 user stories fully implemented
-- ✅ 10 API endpoints documented and functional
-- ✅ Complete reservation lifecycle working end-to-end (reserve → checkout → return)
-- ✅ Role-based access control enforced (Patron vs Librarian)
-- ✅ JWT authentication with 24-hour token expiration
+- Three independent services deployed and running
+- Each service has its own database
+- Inter-service communication working correctly
+- Services can be deployed and scaled independently
 
-### Technical Requirements
+### User Story Compliance
 
-- ✅ OpenAPI documentation complete and accessible
-- ✅ Deployed to AWS Elastic Beanstalk with RDS PostgreSQL integration
+- All 11 user stories fully implemented
+- All acceptance criteria met
+- All business rules enforced (5 reservation limit, 7-day expiry, 14-day checkout, $1/day late fees)
 
-### Quality Standards
+### API Contract Compliance
 
-- ✅ Clean code principles followed
-- ✅ SOLID principles applied
-- ✅ Async/await pattern used throughout
-- ✅ Dependency injection configured properly
-- ✅ Comprehensive error handling (400, 401, 403, 404, 500)
-- ✅ Proper logging throughout application
-- ✅ Production-ready configuration for AWS deployment
+- All 10 endpoints implemented as specified across all services
+- Request/response formats match exactly
+- HTTP status codes correct
+- Error response format consistent
+- Authentication and authorization working properly
 
-### Business Rules Implemented
+### Technical Quality
 
-- ✅ Maximum 5 active reservations per user
-- ✅ 7-day reservation expiry period
-- ✅ 14-day checkout period
-- ✅ $1.00 per day late fee calculation
-- ✅ Real-time book availability tracking
+- Minimum 80% test coverage across all services
+- All endpoints tested (unit and integration)
+- Inter-service communication tested
+- Proper error handling (400, 401, 403, 404, 500)
+- Security properly implemented (JWT, role-based access)
+- Successfully deployed to cloud environment
 
-For detailed implementation guides, refer to the milestone documents in the `docs/` directory.
+### Functional Verification
+
+- Complete reservation lifecycle works across services (reserve → checkout → return)
+- Role-based access control enforced (Patron vs Librarian)
+- Real-time availability tracking works correctly
+- Late fee calculation accurate
+- User profile retrieves statistics from Reservation Service
+- Reservation Service validates users via User Service
+- Reservation Service updates availability via Catalog Service
+
+---
+
+## Development Philosophy
+
+### Requirements-Driven Development
+
+1. Understand the requirements (User Stories and API Contracts)
+2. Design your microservices architecture (service boundaries, communication)
+3. Plan your implementation (data models, inter-service contracts)
+4. Build to meet the contract
+5. Verify completeness (test against acceptance criteria)
+
+### Implementation Flexibility
+
+You decide:
+
+- Internal code organization and architecture for each service
+- Service layer design patterns
+- Repository implementation approaches
+- Validation strategies
+- Testing frameworks
+- Error handling mechanisms
+- HTTP client implementation for inter-service calls
+
+### Non-Negotiable Constraints
+
+You must adhere to:
+
+- User Story requirements and acceptance criteria
+- API Contract specifications
+- Microservices architecture (3 independent services)
+- Business rules (reservation limits, dates, fees)
+- Technology stack (ASP.NET Core, PostgreSQL, JWT)
+- Security requirements (authentication, authorization)
+- Database per Service pattern
+
+---
+
+## Quick Start Guide
+
+1. Read [User Stories](docs/user-stories.md) to understand what you're building
+2. Study [API Contracts](docs/api-contracts.md) to understand the exact API interface
+3. Review [Milestone 1](docs/milestone-1-microservices-architecture-data-modeling.md) for microservices architecture
+4. Set up your environment using [Development Environment Setup](docs/dev-environment-setup.md)
+5. Build each service following Milestones 2-4
+6. Test comprehensively across all services (Milestone 5)
+7. Deploy to production following Milestone 6 guidance
+
+---
+
+## Local Development
+
+### Running All Services
+
+Each service runs on a different port:
+
+```bash
+# Terminal 1 - User Service
+cd UserService
+dotnet run
+# Runs on http://localhost:5001
+
+# Terminal 2 - Catalog Service
+cd CatalogService
+dotnet run
+# Runs on http://localhost:5002
+
+# Terminal 3 - Reservation Service
+cd ReservationService
+dotnet run
+# Runs on http://localhost:5003
+```
+
+### Accessing Swagger UI
+
+- User Service: http://localhost:5001/swagger
+- Catalog Service: http://localhost:5002/swagger
+- Reservation Service: http://localhost:5003/swagger
+
+---
+
+## Support & Resources
+
+- **User Stories**: Business requirements and functionality definitions
+- **API Contracts**: External API interface specifications
+- **Milestone Guides**: Implementation guidance and acceptance criteria
+- **ASP.NET Core Documentation**: Framework reference
+- **Entity Framework Core Documentation**: ORM reference
+- **PostgreSQL Documentation**: Database reference
+
+---
+
+**Remember**: User Stories and API Contracts define **WHAT** you must build. Milestone documents suggest **HOW** you
+might approach it, but you have flexibility in implementation as long as you meet the requirements and follow the
+microservices architecture.
