@@ -115,7 +115,7 @@ API Contracts.
 2. [Milestone 2: User Service & Authentication](docs/milestone-2-user-service-authentication.md)
 3. [Milestone 3: Catalog Service](docs/milestone-3-catalog-service.md)
 4. [Milestone 4: Reservation Service](docs/milestone-4-reservation-service-core-functionality.md)
-5. [Milestone 6: Deployment & Production Readiness](docs/milestone-5-deployment-production-readiness.md)
+5. [Milestone 5: Deployment & Production Readiness](docs/milestone-5-deployment-production-readiness.md)
 
 ### Environment Setup
 
