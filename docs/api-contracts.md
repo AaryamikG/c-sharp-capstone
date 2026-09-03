@@ -458,10 +458,10 @@ Authorization: Bearer {token}
 - Fetch reservation by reservationId
 - Validate reservation status is RESERVED
 - Update reservation:
-    - Set status = CHECKED_OUT
-    - Set checkedOutAt = current timestamp
-    - Set dueDate = checkedOutAt + 14 days
-    - Store optional notes
+  - Set status = CHECKED_OUT
+  - Set checkedOutAt = current timestamp
+  - Set dueDate = checkedOutAt + 14 days
+  - Store optional notes
 - Return updated reservation with formatted due date message
 
 ---
@@ -542,15 +542,20 @@ Authorization: Bearer {token}
 - Fetch reservation by reservationId
 - Validate reservation status is CHECKED_OUT
 - Update reservation:
-    - Set status = RETURNED
-    - Set returnedAt = current timestamp
-    - Store condition (GOOD, FAIR, POOR, DAMAGED)
-    - Store optional notes
+  - Set status = RETURNED
+  - Set returnedAt = current timestamp
+  - Store condition (GOOD, FAIR, POOR, DAMAGED)
+  - Store optional notes
 - Calculate late fees:
-    - If returnedAt > dueDate: lateDays = days between dueDate and returnedAt
-    - lateFee = lateDays × $1.00 per day
-    - Store lateDays and lateFee in reservation
-- Increment book's availableCopies by 1
+  - If returnedAt > dueDate: lateDays = days between dueDate and returnedAt
+  - lateFee = lateDays × $1.00 per day
+  - Store lateDays and lateFee in reservation
+- Check for an eligible waitlist entry on this book (see `POST /api/reservations/waitlist` section below
+  for what "eligible" means):
+  - If one exists: do NOT increment availableCopies. Instead, auto-create a new Reservation (status
+    RESERVED) for that patron, and update their waitlist entry to status NOTIFIED with
+    claimDeadline = now + 48 hours
+  - If none exists: increment book's availableCopies by 1, same as before
 - Return response with late fee details if applicable
 
 ---
@@ -619,6 +624,167 @@ Authorization: Bearer {token}
 
 ---
 
+#### POST /api/reservations/waitlist
+
+Join the waitlist for a book that currently has no available copies.
+
+**Access:** Requires authentication (Bearer token)
+
+**Headers:**
+
+```
+Authorization: Bearer {token}
+```
+
+**Request Body:**
+
+```json
+{
+  "bookId": "uuid-book-1"
+}
+```
+
+**Success Response (201 Created):**
+
+```json
+{
+  "waitlistId": "uuid-wait-1",
+  "bookId": "uuid-book-1",
+  "bookTitle": "Clean Code",
+  "status": "WAITING",
+  "joinedAt": "2025-10-10T10:00:00Z",
+  "position": 3
+}
+```
+
+**Error Response (400 Bad Request - Book Available):**
+
+```json
+{
+  "error": "BOOK_AVAILABLE",
+  "message": "This book currently has available copies - reserve it directly instead of joining the waitlist",
+  "timestamp": "2025-10-10T10:00:00Z"
+}
+```
+
+**Error Response (400 Bad Request - Already Waitlisted):**
+
+```json
+{
+  "error": "ALREADY_WAITLISTED",
+  "message": "You are already on the waitlist for this book",
+  "timestamp": "2025-10-10T10:00:00Z"
+}
+```
+
+**Business Logic:**
+
+- Extract userId from JWT token
+- Verify the book's availableCopies = 0 (via Catalog Service); return BOOK_AVAILABLE if not
+- Verify the user doesn't already have a WAITING entry for this book; return ALREADY_WAITLISTED if they do
+- Create waitlist entry with status = WAITING and joinedAt = current timestamp
+- Compute position as the entry's 1-indexed rank among WAITING entries for this book, ordered by joinedAt
+- Return the created entry with computed position
+
+---
+
+#### GET /api/reservations/waitlist
+
+Retrieve the currently authenticated user's active waitlist entries.
+
+**Access:** Requires authentication (Bearer token)
+
+**Headers:**
+
+```
+Authorization: Bearer {token}
+```
+
+**Success Response (200 OK):**
+
+```json
+{
+  "entries": [
+    {
+      "waitlistId": "uuid-wait-1",
+      "bookId": "uuid-book-1",
+      "bookTitle": "Clean Code",
+      "bookAuthor": "Robert C. Martin",
+      "status": "WAITING",
+      "joinedAt": "2025-10-10T10:00:00Z",
+      "position": 3
+    },
+    {
+      "waitlistId": "uuid-wait-2",
+      "bookId": "uuid-book-5",
+      "bookTitle": "Refactoring",
+      "bookAuthor": "Martin Fowler",
+      "status": "NOTIFIED",
+      "joinedAt": "2025-09-28T10:00:00Z",
+      "notifiedAt": "2025-10-09T09:00:00Z",
+      "claimDeadline": "2025-10-11T09:00:00Z"
+    }
+  ]
+}
+```
+
+**Business Logic:**
+
+- Extract userId from JWT token
+- Fetch all WAITING and NOTIFIED entries belonging to this user
+- For WAITING entries, compute current queue position
+- For NOTIFIED entries, include the claimDeadline instead of a position
+- Join with book data to include bookTitle and bookAuthor
+
+---
+
+#### DELETE /api/reservations/waitlist/{waitlistId}
+
+Leave a waitlist voluntarily.
+
+**Access:** Requires authentication (Bearer token) - can only cancel your own entry
+
+**Headers:**
+
+```
+Authorization: Bearer {token}
+```
+
+**Path Parameters:**
+
+- `waitlistId` (UUID, required) - Unique identifier of the waitlist entry
+
+**Success Response (200 OK):**
+
+```json
+{
+  "waitlistId": "uuid-wait-1",
+  "status": "CANCELLED",
+  "message": "You have been removed from the waitlist"
+}
+```
+
+**Error Response (404 Not Found):**
+
+```json
+{
+  "error": "NOT_FOUND",
+  "message": "Waitlist entry not found",
+  "timestamp": "2025-10-10T10:00:00Z"
+}
+```
+
+**Business Logic:**
+
+- Extract userId from JWT token
+- Fetch waitlist entry by waitlistId; return 404 if it doesn't exist or doesn't belong to this user
+- Set status = CANCELLED
+- If the entry's prior status was NOTIFIED (it was actively holding a claim), immediately run the same
+  cascade logic the expiry background job uses: offer the copy to the next eligible WAITING entry for
+  that book, or release it back to general availability if none exists
+
+---
+
 ## Common Error Responses
 
 All endpoints may return the following error responses:
@@ -663,4 +829,7 @@ All endpoints may return the following error responses:
 - Reservation expiry period: 7 days from reservation
 - Checkout period: 14 days from checkout
 - Late fee rate: $1.00 per day
+- Waitlist claim window: 48 hours from notification
+- Waitlist eligibility (the 5-reservation limit) is checked at claim time, not join time - a patron
+  under the limit when they join can still be skipped later if they've since hit the limit
 - Roles: PATRON (regular users), LIBRARIAN (can checkout/return books)

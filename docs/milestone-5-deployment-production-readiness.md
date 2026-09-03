@@ -1,8 +1,8 @@
-# Milestone 6: Deployment & Production Readiness
+# Milestone 5: Deployment & Production Readiness
 
 **Goal:** Deploy all three microservices to cloud infrastructure with production databases
 
-**Related User Stories:** All (US-001 through US-011) - Production deployment
+**Related User Stories:** All (US-001 through US-014) - Production deployment
 
 ---
 
@@ -32,7 +32,9 @@
 - AWS Elastic Beanstalk (or equivalent cloud platform)
 - .NET 8.0 or 9.0 runtime environment
 - Three separate application deployments (one per service)
-- Free tier eligible instances
+- Free tier eligible instances for application hosting (Elastic Beanstalk/EC2). Note: the RDS database
+  instance itself uses `db.t3.medium`, which is **not** Free Tier eligible - see the cost note in
+  `production-environment-setup.md` for expected cost and how to delete it when you're done.
 
 **Database:**
 - PostgreSQL 15.x on AWS RDS (or equivalent)
@@ -68,9 +70,9 @@ Prepare each microservice for deployment:
 ### 2. Database Setup
 Create production databases:
 - Three PostgreSQL database instances (or three databases on one instance)
-    - UserServiceDb
-    - CatalogServiceDb
-    - ReservationServiceDb
+  - UserServiceDb
+  - CatalogServiceDb
+  - ReservationServiceDb
 - Initial database creation
 - Secure credential generation
 - Network configuration for application access
@@ -159,7 +161,8 @@ Verify deployment success for all services:
 - [ ] Authenticated endpoints require valid token
 - [ ] Role-based authorization enforced (LIBRARIAN operations)
 - [ ] Database schemas created automatically for all services
-- [ ] All 11 API endpoints functional in production across all services
+- [ ] All 13 API endpoints functional in production across all services
+- [ ] Waitlist expiry background job runs and logs its activity in the deployed Reservation Service
 
 ---
 
@@ -189,8 +192,11 @@ After deployment, verify each service and inter-service communication:
 - Reservation creation works (validates via User Service, updates via Catalog Service)
 - Active reservations display correctly
 - Checkout works (LIBRARIAN only)
-- Return works (LIBRARIAN only, updates Catalog Service)
+- Return works (LIBRARIAN only, updates Catalog Service or auto-claims for a waitlisted patron)
 - Borrowing history works
+- Patron can join, view, and leave a book's waitlist
+- Waitlist expiry background job is running (check logs after deployment for its periodic activity, or
+  temporarily shorten its interval to verify behavior faster)
 
 ### Inter-Service Communication
 - User Service successfully calls Reservation Service for profile statistics

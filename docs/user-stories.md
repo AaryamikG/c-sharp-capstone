@@ -156,17 +156,55 @@
   - Returns 200 with paginated history
   - Requires authentication
 
+**US-012: Join a Book's Waitlist**
+- **As a** library patron
+- **I want to** join the waitlist for a book that has no available copies
+- **So that** I'm notified and get first claim when a copy is returned
+- **Acceptance Criteria**:
+  - Patron can only join a waitlist when availableCopies = 0 (otherwise, they should reserve directly)
+  - Patron can only have one active (Waiting) waitlist entry per book at a time
+  - Waitlist entry is created with status WAITING and joinedAt timestamp
+  - Returns 201 with waitlistId, bookId, bookTitle, status, joinedAt, position (queue position, 1-indexed)
+  - Returns 400 if the book actually has available copies (BOOK_AVAILABLE - should reserve instead)
+  - Returns 400 if the user already has an active waitlist entry for this book (ALREADY_WAITLISTED)
+  - Requires authentication
+
+**US-013: View My Waitlist Entries**
+- **As a** library patron
+- **I want to** see every waitlist I've joined and my position in each queue
+- **So that** I know roughly how long I'll wait for each book
+- **Acceptance Criteria**:
+  - Shows all of the user's waitlist entries with status WAITING or NOTIFIED
+  - For WAITING entries: shows current queue position (computed, not stored)
+  - For NOTIFIED entries: shows the claim deadline (48 hours from notification)
+  - Includes book details: bookId, bookTitle, bookAuthor
+  - Returns 200 with waitlist entries array
+  - Requires authentication
+
+**US-014: Leave a Waitlist**
+- **As a** library patron
+- **I want to** remove myself from a book's waitlist
+- **So that** I'm not offered a book I no longer want, and others move up the queue
+- **Acceptance Criteria**:
+  - Patron can cancel their own WAITING or NOTIFIED entry
+  - Status changes to CANCELLED
+  - If the cancelled entry was NOTIFIED (i.e., currently holding a claim window), the held copy is
+    immediately offered to the next WAITING entry in that book's queue, same as a normal expiry
+  - Returns 200 with confirmation message
+  - Returns 404 if the waitlist entry doesn't belong to the requesting user or doesn't exist
+  - Requires authentication
+
 ---
 
 ## Summary
 
-**Total User Stories: 11**
+**Total User Stories: 14**
 
 - **Epic 1 (Authentication):** 3 user stories
 - **Epic 2 (Catalog):** 3 user stories
-- **Epic 3 (Reservations):** 5 user stories
+- **Epic 3 (Reservations & Waitlist):** 8 user stories
 
-**Endpoints Coverage (10 Total):**
+**Endpoints Coverage (13 Total):**
 1. POST /api/auth/register → US-001
 2. POST /api/auth/login → US-002
 3. GET /api/users/profile → US-003
@@ -177,3 +215,11 @@
 8. POST /api/reservations/{reservationId}/checkout → US-009
 9. POST /api/reservations/{reservationId}/return → US-010
 10. GET /api/reservations/history → US-011
+11. POST /api/reservations/waitlist → US-012
+12. GET /api/reservations/waitlist → US-013
+13. DELETE /api/reservations/waitlist/{waitlistId} → US-014
+
+**System behavior (no direct endpoint):** A background job in Reservation Service periodically expires
+NOTIFIED waitlist entries whose claim deadline has passed, then cascades the held copy to the next WAITING
+entry in that book's queue (or releases it back to general availability if the queue is empty). See
+Milestone 4 for details.

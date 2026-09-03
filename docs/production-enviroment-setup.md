@@ -18,6 +18,14 @@ You have two options:
 
 We'll use **Option 2**: One RDS instance with three databases.
 
+> **Cost note:** This guide uses `db.t3.medium`, which is **not** covered by the AWS Free Tier (Free Tier
+> only covers `db.t2.micro`/`db.t3.micro`). Running `db.t3.medium` continuously costs real money -
+> roughly $50-60/month in `us-east-1` at standard on-demand pricing, before storage. When you're done
+> with the project, delete the RDS instance via **AWS Console → RDS → select the instance → Actions →
+> Delete** to avoid ongoing charges (this guide doesn't currently include a full teardown section - for
+> now, deleting the RDS instance and each Elastic Beanstalk environment individually via their consoles
+> is the way to stop billing).
+
 **AWS Console → RDS → Create database**
 
 **Required Configuration:**
@@ -29,7 +37,7 @@ We'll use **Option 2**: One RDS instance with three databases.
 | Master username        | `postgres`                 | Database admin user                 |
 | Master password        | Create secure password     | Save this - required for connection |
 | Credentials management | Self managed               | Manual password control             |
-| Instance class         | `db.t4g.micro`             | Burstable classes section           |
+| Instance class         | `db.t3.medium`             | Burstable classes section           |
 | Storage type           | General Purpose SSD (gp2)  | Default option                      |
 | Allocated storage      | 20 GiB                     | As specified                        |
 | Compute resource       | Don't connect to EC2       | Manual configuration                |
@@ -249,18 +257,18 @@ After all services and RDS are running:
 2. Find the RDS security group (check RDS instance details for security group ID)
 3. Click **Edit inbound rules**
 4. Add three inbound rules:
-    - **Type:** PostgreSQL, **Port:** 5432, **Source:** User Service security group
-    - **Type:** PostgreSQL, **Port:** 5432, **Source:** Catalog Service security group
-    - **Type:** PostgreSQL, **Port:** 5432, **Source:** Reservation Service security group
+   - **Type:** PostgreSQL, **Port:** 5432, **Source:** User Service security group
+   - **Type:** PostgreSQL, **Port:** 5432, **Source:** Catalog Service security group
+   - **Type:** PostgreSQL, **Port:** 5432, **Source:** Reservation Service security group
 5. Click **Save rules**
 
 ### Allow Inter-Service Communication
 
 1. **AWS Console → EC2 → Security Groups**
 2. For each Elastic Beanstalk security group:
-    - Click **Edit inbound rules**
-    - Add HTTP rule allowing traffic from other service security groups
-    - **Type:** HTTP, **Port:** 80, **Source:** Other services' security groups
+   - Click **Edit inbound rules**
+   - Add HTTP rule allowing traffic from other service security groups
+   - **Type:** HTTP, **Port:** 80, **Source:** Other services' security groups
 
 ---
 
@@ -414,6 +422,7 @@ Look for:
 - [ ] Environment health shows "Ok" (green)
 - [ ] Swagger UI accessible
 - [ ] Can create reservations with authentication
+- [ ] Waitlist expiry background job is running (check application logs for its periodic output)
 
 ### Security & Communication
 

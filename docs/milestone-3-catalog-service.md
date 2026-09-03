@@ -11,24 +11,24 @@
 ### Book Browsing (US-004)
 - Library patrons must be able to browse the complete book catalog
 - Results must be paginated for performance
-   - Default: 20 books per page, starting at page 0
+  - Default: 20 books per page, starting at page 0
 - Results must be sortable by:
-   - Title
-   - Author
-   - Publication year
+  - Title
+  - Author
+  - Publication year
 - Sort direction can be ascending or descending (default: ascending)
 - Each book displays: bookId, isbn, title, author, genre, publicationYear, description, totalCopies, availableCopies, status
 - Book status is determined by availability:
-   - Available: availableCopies > 0
-   - CheckedOut: availableCopies = 0
+  - Available: availableCopies > 0
+  - CheckedOut: availableCopies = 0
 - No authentication required (public access)
 
 ### Search and Filtering (US-005)
 - Patrons must be able to search books by title and/or author
 - Patrons can filter by:
-   - Genre (exact match)
-   - ISBN (exact match)
-   - Availability (show only books with copies available)
+  - Genre (exact match)
+  - ISBN (exact match)
+  - Availability (show only books with copies available)
 - Multiple filters can be combined simultaneously
 - Search results maintain pagination and sorting capabilities
 - Empty searches return empty results (not an error)
@@ -45,9 +45,14 @@
 ### Inventory Management
 - Book status is calculated dynamically (not stored)
 - availableCopies automatically updates when:
-   - Reservation created (decrements by 1)
-   - Book returned (increments by 1)
+  - Reservation created (decrements by 1)
+  - Book returned, AND no one is waiting on that book's waitlist (increments by 1)
 - totalCopies represents physical inventory
+
+> **Note:** As of Milestone 4, a returned book with an active waitlist does *not* increment
+> availableCopies - the copy is handed directly to the next waitlisted patron instead. This logic lives
+> entirely in Reservation Service; Catalog Service's role is unchanged (it still just exposes the
+> availability-update endpoint and doesn't need to know *why* an update request was or wasn't made).
 
 ---
 
@@ -109,14 +114,14 @@ Based on `api-contracts.md`, implement these endpoints:
 ### GET /api/catalog/books
 - **Access:** Public (no authentication)
 - **Query Parameters:**
-   - page (integer, default: 0)
-   - size (integer, default: 20)
-   - sortBy (string, default: "title") - options: title, author, publicationYear
-   - sortOrder (string, default: "asc") - options: asc, desc
-   - query (string, optional) - search term for title/author
-   - genre (string, optional) - filter by genre
-   - isbn (string, optional) - filter by ISBN
-   - availableOnly (boolean, default: false)
+  - page (integer, default: 0)
+  - size (integer, default: 20)
+  - sortBy (string, default: "title") - options: title, author, publicationYear
+  - sortOrder (string, default: "asc") - options: asc, desc
+  - query (string, optional) - search term for title/author
+  - genre (string, optional) - filter by genre
+  - isbn (string, optional) - filter by ISBN
+  - availableOnly (boolean, default: false)
 - **Success (200):** Paginated list with content array and metadata
 - **Response includes:** page, size, totalElements, totalPages, last
 

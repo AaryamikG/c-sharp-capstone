@@ -2,7 +2,9 @@
 
 **Goal:** Implement reservation lifecycle management
 
-**Related User Stories:** US-007 (Reserve Available Book), US-008 (View Active Reservations), US-009 (Checkout Book), US-010 (Return Book), US-011 (View Borrowing History)
+**Related User Stories:** US-007 (Reserve Available Book), US-008 (View Active Reservations), US-009
+(Checkout Book), US-010 (Return Book), US-011 (View Borrowing History), US-012 (Join Waitlist), US-013
+(View My Waitlist), US-014 (Leave Waitlist)
 
 ---
 
@@ -13,12 +15,12 @@
 - Users are limited to 5 active reservations (Reserved or CheckedOut status)
 - Reservations expire after 7 days if not picked up
 - When a book is reserved:
-   - Available copies count decreases by 1
-   - Reservation status is set to Reserved
-   - Expiration date is set to 7 days from reservation
+  - Available copies count decreases by 1
+  - Reservation status is set to Reserved
+  - Expiration date is set to 7 days from reservation
 - Error conditions:
-   - Attempting to reserve when at 5 active reservations
-   - Attempting to reserve a book with no available copies
+  - Attempting to reserve when at 5 active reservations
+  - Attempting to reserve a book with no available copies
 
 ### Active Reservations View (US-008)
 - Patrons can view all their active reservations (Reserved or CheckedOut)
@@ -39,11 +41,52 @@
 - Can only return reservations with CheckedOut status
 - Book condition must be recorded (Good, Fair, Poor, Damaged)
 - Late fees are calculated if returned after due date:
-   - Rate: $1.00 per day late
+  - Rate: $1.00 per day late
 - When book is returned:
-   - Available copies count increases by 1
-   - Reservation status is set to Returned
+  - Reservation status is set to Returned
+  - **If the book has an active waitlist:** skip the availableCopies increment entirely. Instead, find
+    the longest-waiting eligible entry (see Waitlist Claim Eligibility below), auto-create a Reserved
+    reservation for that patron, and mark their waitlist entry Notified with a 48-hour ClaimDeadline
+  - **If the book has no waitlist, or everyone waiting is over their reservation limit:** available
+    copies count increases by 1, same as before
 - Optional notes can be recorded
+
+### Waitlist Claim Eligibility
+- A waitlist entry is only eligible to claim a returned copy if that patron currently has fewer than 5
+  active reservations (Reserved or CheckedOut)
+- This is checked at the moment their turn comes up, not when they originally joined the waitlist - a
+  patron's eligibility can change between joining and their turn arriving
+- If the longest-waiting entry is ineligible, expire that entry (status = Expired) and check the next
+  entry in the queue; repeat until an eligible patron is found or the queue is exhausted
+- If the queue is exhausted with no eligible patron, release the copy back to general availability
+  (increment availableCopies), same as the no-waitlist case
+
+### Join Waitlist (US-012)
+- Patrons can join the waitlist for a book with availableCopies = 0
+- Attempting to join when the book actually has available copies returns an error (BOOK_AVAILABLE) -
+  the patron should reserve directly instead
+- A patron can only have one active (Waiting) entry per book at a time
+- Queue position is computed from JoinedAt order, not stored as a field
+
+### View My Waitlist (US-013)
+- Patrons can view their own Waiting and Notified waitlist entries
+- Waiting entries show computed queue position
+- Notified entries show the claim deadline
+
+### Leave Waitlist (US-014)
+- Patrons can cancel their own Waiting or Notified entry at any time
+- Cancelling a Notified entry (one currently holding a claim) immediately cascades the held copy to the
+  next eligible entry in that book's queue - the same logic as a natural expiry, just triggered
+  immediately instead of waiting for the 48-hour deadline
+
+### Waitlist Expiry Background Job
+- A background process (ASP.NET Core `BackgroundService`/`IHostedService`) runs on an interval (e.g.
+  hourly) within Reservation Service
+- Finds all Notified waitlist entries whose ClaimDeadline has passed
+- For each: marks the entry Expired, then applies the same cascade logic described above - offer the
+  copy to the next eligible Waiting entry, or release it back to general availability if none exists
+- This is the first genuinely asynchronous, non-request-driven process in the system - unlike every other
+  piece of business logic so far, it isn't triggered by an incoming HTTP request at all
 
 ### Borrowing History (US-011)
 - Patrons can view their complete borrowing history
@@ -63,6 +106,9 @@
 - Checkout period: 14 days from checkout date
 - Late fee rate: $1.00 per day
 - Book condition options: Good, Fair, Poor, Damaged
+- Waitlist claim window: 48 hours from notification
+- Waitlist eligibility (the 5-reservation limit) is enforced strictly, even for waitlist claims - a patron
+  over the limit is skipped, not exempted
 
 **Data Consistency:**
 - Reservation operations must maintain data integrity
@@ -111,7 +157,8 @@ Implement endpoint that:
 - Updates reservation to Returned status
 - Records return timestamp and book condition
 - Calculates late days and fees (if applicable)
-- Updates book's available copies count
+- Checks for an eligible waitlist entry on the book before deciding whether to increment availableCopies
+  or auto-create a claim reservation instead (see Waitlist Claim Eligibility above)
 - Stores optional notes
 - Returns response with late fee details if applicable
 
@@ -124,6 +171,24 @@ Implement endpoint that:
 - Calculates late return flag for each record
 - Includes book information
 - Returns pagination metadata
+
+### 6. Waitlist Management
+Implement three endpoints that:
+- Allow a patron to join a book's waitlist (only when availableCopies = 0, only one active entry per
+  book per patron)
+- Allow a patron to view their own waitlist entries, with computed queue position for Waiting entries
+  and claim deadline for Notified entries
+- Allow a patron to leave a waitlist voluntarily, cascading the held copy immediately if the cancelled
+  entry was Notified
+
+### 7. Waitlist Expiry Background Job
+Implement a `BackgroundService` (or `IHostedService`) that:
+- Runs on a recurring interval within Reservation Service (does not need its own separate deployment -
+  it runs in-process alongside the web application)
+- Finds Notified entries past their ClaimDeadline
+- Expires them and cascades the copy to the next eligible entry, or releases it back to general
+  availability if the queue is empty or exhausted
+- Logs its activity (how many entries it processed, what it did with each) so its behavior is observable
 
 ---
 
@@ -160,6 +225,21 @@ Based on `api-contracts.md`, implement these endpoints:
 - **Query Parameters:** page (default: 0), size (default: 20)
 - **Success (200):** Paginated history with wasLate flag, includes pagination metadata
 
+### POST /api/reservations/waitlist
+- **Access:** Requires authentication (Patron or Librarian)
+- **Request:** bookId
+- **Success (201):** waitlistId, bookId, bookTitle, status, joinedAt, position
+- **Error (400):** BOOK_AVAILABLE (book isn't out of copies) or ALREADY_WAITLISTED
+
+### GET /api/reservations/waitlist
+- **Access:** Requires authentication (Patron or Librarian)
+- **Success (200):** Array of the user's Waiting/Notified entries, with position or claimDeadline
+
+### DELETE /api/reservations/waitlist/{waitlistId}
+- **Access:** Requires authentication (Patron or Librarian) - can only cancel your own entry
+- **Success (200):** Confirmation message
+- **Error (404):** Entry not found, or doesn't belong to the requesting user
+
 ---
 
 ## Acceptance Criteria
@@ -180,6 +260,18 @@ Based on `api-contracts.md`, implement these endpoints:
 - [ ] wasLate flag correctly calculated in history
 - [ ] Cannot checkout reservation that is not Reserved (400 error)
 - [ ] Cannot return reservation that is not CheckedOut (400 error)
+- [ ] Returning a book with no waitlist increments availableCopies (existing behavior unchanged)
+- [ ] Returning a book with an eligible waitlisted patron does NOT increment availableCopies - instead
+  auto-creates a Reserved reservation for that patron and sets their waitlist entry to Notified
+- [ ] Returning a book skips waitlist entries belonging to patrons already at their 5-reservation limit
+- [ ] Patron can join a waitlist only when availableCopies = 0
+- [ ] Patron cannot join the same book's waitlist twice while already Waiting
+- [ ] Patron can view their own waitlist entries with computed position
+- [ ] Patron can leave their own waitlist entry
+- [ ] Leaving a Notified entry immediately cascades the copy to the next eligible entry
+- [ ] Background job expires Notified entries past their 48-hour ClaimDeadline
+- [ ] Background job cascades expired claims to the next eligible waitlist entry, or releases the copy
+  back to general availability if none exists
 
 ---
 
@@ -201,6 +293,7 @@ Based on `api-contracts.md`, implement these endpoints:
 
 ## Resources
 
-- Refer to `user-stories.md` for US-007, US-008, US-009, US-010, US-011 details
+- Refer to `user-stories.md` for US-007, US-008, US-009, US-010, US-011, US-012, US-013, US-014 details
 - Refer to `api-contracts.md` for exact request/response formats
 - DateTime and TimeSpan documentation for date/time calculations
+- `BackgroundService` documentation for implementing the waitlist expiry job

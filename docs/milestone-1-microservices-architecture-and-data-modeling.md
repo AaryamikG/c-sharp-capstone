@@ -2,7 +2,7 @@
 
 **Goal:** Design microservices architecture and create entity classes for the Library Management System
 
-**Related User Stories:** Foundation for US-001 through US-011
+**Related User Stories:** Foundation for US-001 through US-014
 
 ---
 
@@ -50,6 +50,18 @@ The Library Management System must be built as a **microservices architecture** 
 - Late fees calculated at $1.00 per day
 - Maximum 5 active reservations per user
 - Book condition recorded upon return
+
+**Waitlist:**
+- Patrons may join a waitlist when a book has no available copies (availableCopies = 0)
+- When a copy is returned and a waitlist exists for that book, the copy is offered to the longest-waiting
+  eligible patron instead of becoming generally available
+- "Eligible" means the patron is still under their 5-active-reservation limit at the moment their turn comes
+  up - a patron over the limit is skipped (their waitlist entry expires) and the copy cascades to the next
+  person in line
+- A notified patron has 48 hours to claim their held copy (a normal Reservation is auto-created for them)
+  before it cascades to the next person in the queue
+- If the queue is empty (or everyone in it is skipped for being over the limit), the copy is released back
+  to general availability, same as today's behavior
 
 ---
 
@@ -108,7 +120,7 @@ Define three separate ASP.NET Core projects:
   - PUT /api/catalog/books/{bookId}/availability (internal - for Reservation Service)
 
 **ReservationService (Port: 5003)**
-- Handles: Reservations, checkout, returns, history
+- Handles: Reservations, checkout, returns, history, waitlist
 - Database: ReservationServiceDb
 - Exposes endpoints:
   - POST /api/reservations
@@ -116,6 +128,10 @@ Define three separate ASP.NET Core projects:
   - POST /api/reservations/{reservationId}/checkout
   - POST /api/reservations/{reservationId}/return
   - GET /api/reservations/history
+  - POST /api/reservations/waitlist
+  - GET /api/reservations/waitlist
+  - DELETE /api/reservations/waitlist/{waitlistId}
+- Also runs: a background job (see Deliverable 6) that periodically expires stale waitlist claims
 
 ### 2. Entity Classes Per Service
 
@@ -171,6 +187,19 @@ Define three separate ASP.NET Core projects:
 - BookAuthor (string, cached from Catalog Service)
 - CreatedAt, UpdatedAt (audit fields)
 
+**Waitlist Entity:**
+- WaitlistId (Guid, Primary Key)
+- BookId (Guid, reference to Catalog Service)
+- UserId (Guid, reference to User Service)
+- Status (enum: Waiting, Notified, Claimed, Expired, Cancelled)
+- JoinedAt (DateTime, required)
+- NotifiedAt (DateTime?, nullable) - set when a held copy is offered to this entry
+- ClaimDeadline (DateTime?, nullable) - NotifiedAt + 48 hours; set alongside NotifiedAt
+- ResultingReservationId (Guid?, nullable) - set to the auto-created Reservation's Id once claimed
+- BookTitle (string, cached from Catalog Service)
+- BookAuthor (string, cached from Catalog Service)
+- CreatedAt, UpdatedAt (audit fields)
+
 ### 3. Enum Types
 
 **User Service Enums:**
@@ -183,6 +212,7 @@ public enum MembershipStatus { Active, Suspended }
 ```csharp
 public enum ReservationStatus { Reserved, CheckedOut, Returned, Cancelled }
 public enum BookCondition { Good, Fair, Poor, Damaged }
+public enum WaitlistStatus { Waiting, Notified, Claimed, Expired, Cancelled }
 ```
 
 ### 4. DbContext Per Service
@@ -220,8 +250,8 @@ Create separate DbContext for each service:
 - [ ] Three separate ASP.NET Core projects created (UserService, CatalogService, ReservationService)
 - [ ] Each service runs independently on different ports (5001, 5002, 5003)
 - [ ] Each service has its own DbContext and database
-- [ ] All entity classes created with proper data annotations
-- [ ] All enum types defined in appropriate services
+- [ ] All entity classes created with proper data annotations, including Waitlist
+- [ ] All enum types defined in appropriate services, including WaitlistStatus
 - [ ] Entity relationships properly configured within each service
 - [ ] Audit fields (CreatedAt, UpdatedAt) auto-populate in each service
 - [ ] HTTP client configured for inter-service communication
