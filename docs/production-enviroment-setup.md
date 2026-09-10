@@ -191,6 +191,8 @@ unzip -l ReservationService.zip | grep -i migration
 
 **Environment Variables for User Service:**
 
+* Don't include the `[]` in your actual values, replace them
+
 | Name                                   | Value                                                                                             | Description                                          |
 |----------------------------------------|---------------------------------------------------------------------------------------------------|------------------------------------------------------|
 | `ASPNETCORE_ENVIRONMENT`               | `Production`                                                                                      | Activates production configuration                   |
