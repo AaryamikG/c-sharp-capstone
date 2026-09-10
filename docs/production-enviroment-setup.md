@@ -89,8 +89,9 @@ For each microservice, add PostgreSQL support:
 
 ```bash
 # Navigate to each service directory and run:
-dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
-dotnet add package Microsoft.EntityFrameworkCore.Design
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL --version 10.0.3
+dotnet add package Microsoft.EntityFrameworkCore.Design --version 10.0.10
+dotnet add package Microsoft.EntityFrameworkCore.InMemory --version 10.0.10
 ```
 
 ### Update Program.cs for Production
@@ -121,13 +122,26 @@ For each service:
 dotnet tool install --global dotnet-ef
 export PATH="$PATH:$HOME/.dotnet/tools"
 
-# Navigate to each service directory
+# User Service
 cd UserService
+dotnet restore
 dotnet ef migrations add InitialCreate
-cd ../CatalogService
+dotnet ef migrations list
+cd ..
+
+# Catalog Service
+cd CatalogService
+dotnet restore
 dotnet ef migrations add InitialCreate
-cd ../ReservationService
+dotnet ef migrations list
+cd ..
+
+# Reservation Service
+cd ReservationService
+dotnet restore
 dotnet ef migrations add InitialCreate
+dotnet ef migrations list
+cd ..
 ```
 
 ### Build Production Packages
@@ -160,9 +174,7 @@ zip -r ../../ReservationService.zip .
 cd ../..
 
 # Verify migrations are included
-unzip -l UserService.zip | grep -i migration
-unzip -l CatalogService.zip | grep -i migration
-unzip -l ReservationService.zip | grep -i migration
+dotnet ef migrations list
 ```
 
 ---
@@ -182,7 +194,7 @@ unzip -l ReservationService.zip | grep -i migration
 | Environment name | `user-service-env`                                  |
 | Domain           | Leave blank (auto-generated)                        |
 | Platform         | .NET Core on Linux                                  |
-| Platform branch  | .NET 8 or .NET 9 running on 64bit Amazon Linux 2023 |
+| Platform branch  | .NET 10 running on 64bit Amazon Linux |
 | Platform version | Latest recommended version                          |
 | Application code | Upload your code                                    |
 | Version label    | `v1.0.0`                                            |
