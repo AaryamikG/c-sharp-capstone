@@ -36,7 +36,7 @@ We'll use **Option 2**: One RDS instance with three databases. (db.t3.micro)
 | Network type           | IPv4                       | Standard                            |
 | VPC                    | Default VPC                | Must match Elastic Beanstalk        |
 | DB subnet group        | default                    | Use existing                        |
-| Public access          | ye                         | Security best practice              |
+| Public access          | yes                         | Security best practice              |
 | VPC security group     | default                    | Will configure later                |
 | Initial database name  | `userservicedb`            | First database (User Service)       |
 
