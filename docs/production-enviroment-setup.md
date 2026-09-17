@@ -16,15 +16,7 @@ You have two options:
 1. **Three separate database instances** (more isolated, higher cost)
 2. **One database instance with three databases** (recommended, cost-effective)
 
-We'll use **Option 2**: One RDS instance with three databases.
-
-> **Cost note:** This guide uses `db.t3.medium`, which is **not** covered by the AWS Free Tier (Free Tier
-> only covers `db.t2.micro`/`db.t3.micro`). Running `db.t3.medium` continuously costs real money -
-> roughly $50-60/month in `us-east-1` at standard on-demand pricing, before storage. When you're done
-> with the project, delete the RDS instance via **AWS Console → RDS → select the instance → Actions →
-> Delete** to avoid ongoing charges (this guide doesn't currently include a full teardown section - for
-> now, deleting the RDS instance and each Elastic Beanstalk environment individually via their consoles
-> is the way to stop billing).
+We'll use **Option 2**: One RDS instance with three databases. (db.t3.micro)
 
 **AWS Console → RDS → Create database**
 
@@ -37,14 +29,14 @@ We'll use **Option 2**: One RDS instance with three databases.
 | Master username        | `postgres`                 | Database admin user                 |
 | Master password        | Create secure password     | Save this - required for connection |
 | Credentials management | Self managed               | Manual password control             |
-| Instance class         | `db.t3.medium`             | Burstable classes section           |
+| Instance class         | `db.t3.micro`             | Burstable classes section           |
 | Storage type           | General Purpose SSD (gp2)  | Default option                      |
 | Allocated storage      | 20 GiB                     | As specified                        |
 | Compute resource       | Don't connect to EC2       | Manual configuration                |
 | Network type           | IPv4                       | Standard                            |
 | VPC                    | Default VPC                | Must match Elastic Beanstalk        |
 | DB subnet group        | default                    | Use existing                        |
-| Public access          | No                         | Security best practice              |
+| Public access          | ye                         | Security best practice              |
 | VPC security group     | default                    | Will configure later                |
 | Initial database name  | `userservicedb`            | First database (User Service)       |
 
@@ -79,6 +71,8 @@ CREATE DATABASE reservationservicedb;
 \q
 ```
 
+
+- Note after this you can turn public access off again, you just need this to create the extra databases
 ---
 
 ## Part 2: Application Preparation
