@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.EntityFrameworkCore;
 using CatalogService.Data;
+using CatalogService.Middleware;
+using CatalogService.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,14 +33,21 @@ builder.Services.AddDbContext<CatalogServiceDbContext>(options =>
     }
 });
 
+builder.Services.AddScoped<IBookService, BookService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<CatalogServiceDbContext>();
+    await CatalogServiceSeeder.SeedAsync(dbContext);
 }
 
+app.UseExceptionHandling();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
