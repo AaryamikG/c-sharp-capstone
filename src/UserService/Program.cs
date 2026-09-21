@@ -52,6 +52,10 @@ builder.Services.AddSwaggerGen(c =>
         In = ParameterLocation.Header,
         Description = "Enter a valid JWT token"
     });
+    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
 });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
