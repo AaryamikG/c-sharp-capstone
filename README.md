@@ -1,5 +1,35 @@
 # Digital Library Management System API (.NET Microservices)
 
+## Live Deployment
+
+Deployed to AWS Elastic Beanstalk (one environment, three services routed by nginx) with RDS PostgreSQL.
+
+- User Service Swagger: http://library-microservices-env-env-2.eba-nxiuymym.us-east-1.elasticbeanstalk.com/swagger
+- Catalog Service Swagger: http://library-microservices-env-env-2.eba-nxiuymym.us-east-1.elasticbeanstalk.com/catalog/swagger
+- Reservation Service Swagger: http://library-microservices-env-env-2.eba-nxiuymym.us-east-1.elasticbeanstalk.com/reservations/swagger
+
+## Quick Testing Guide
+
+**Locally** (in-memory database, no setup required):
+
+```bash
+dotnet run --project src/UserService/UserService.csproj
+dotnet run --project src/CatalogService/CatalogService.csproj
+dotnet run --project src/ReservationService/ReservationService.csproj
+```
+
+Then open Swagger at `http://localhost:5001/swagger`, `:5002/swagger`, `:5003/swagger`. Seeded test
+accounts: `patron@library.test` / `librarian@library.test`, both with password `Password123!`.
+
+**Golden path** (same steps locally or against the live deployment above):
+
+1. User Service → `POST /api/auth/register` (or `/api/auth/login` with a seeded account) → copy the `accessToken`
+2. Click **Authorize** on the Swagger page and paste the token (no "Bearer " prefix)
+3. `GET /api/users/profile` to confirm authentication works
+4. Catalog Service → `GET /api/catalog/books` → copy a `bookId`
+5. Reservation Service → Authorize with the same token → `POST /api/reservations` with that `bookId`
+6. Log in as a Librarian, Authorize on Reservation Service with that token → `POST /api/reservations/{id}/checkout` → `POST /api/reservations/{id}/return`
+
 ## Business Context
 
 ### Overview

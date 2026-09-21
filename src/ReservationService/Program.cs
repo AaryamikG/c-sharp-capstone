@@ -40,7 +40,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = builder.Configuration.GetConnectionString("ReservationDb");
 builder.Services.AddDbContext<ReservationServiceDbContext>(options =>
 {
     if (builder.Environment.IsDevelopment() || string.IsNullOrWhiteSpace(connectionString))
@@ -121,17 +121,34 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI();
+
+if (!app.Environment.IsDevelopment() && !string.IsNullOrWhiteSpace(connectionString))
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ReservationServiceDbContext>();
+    await dbContext.Database.MigrateAsync();
 }
 
 app.UseExceptionHandling();
-app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/health", async (ReservationServiceDbContext db) =>
+{
+    if (db.Database.IsRelational())
+    {
+        return Results.Ok(new
+        {
+            service = "ReservationService",
+            database = db.Database.GetDbConnection().Database,
+            migrations = (await db.Database.GetAppliedMigrationsAsync()).Count()
+        });
+    }
+
+    return Results.Ok(new { service = "ReservationService", database = "in-memory", migrations = 0 });
+});
 
 app.Run();
 
